@@ -97,7 +97,7 @@ class Payment:
                     self.journal.currency, processing_amount,
                     self.company.currency)
         else:
-            local_amount = processing_amount
+            local_amount = self.company.currency.round(processing_amount)
 
         move = Move(
             journal=self.journal.processing_journal,
