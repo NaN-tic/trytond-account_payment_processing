@@ -66,7 +66,7 @@ class Payment:
 
         return group
 
-    def create_processing_move(self):
+    def create_processing_move(self, date=None):
         pool = Pool()
         Currency = pool.get('currency.currency')
         Move = pool.get('account.move')
@@ -82,7 +82,8 @@ class Payment:
         if self.processing_move:
             return self.processing_move
 
-        date = Date.today()
+        if date is None:
+            date = Date.today()
         period = Period.find(self.company.id, date=date)
 
         # compatibility with account_bank_statement_payment
