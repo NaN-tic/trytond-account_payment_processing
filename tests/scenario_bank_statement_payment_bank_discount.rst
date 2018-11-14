@@ -9,116 +9,50 @@ Imports::
     >>> from decimal import Decimal
     >>> from operator import attrgetter
     >>> from proteus import config, Model, Wizard
+    >>> from trytond.tests.tools import activate_modules
+    >>> from trytond.modules.company.tests.tools import create_company, \
+    ...     get_company
+    >>> from trytond.modules.account.tests.tools import create_fiscalyear, \
+    ...     create_chart, get_accounts, create_tax
+    >>> from trytond.modules.account_invoice.tests.tools import \
+    ...     set_fiscalyear_invoice_sequences
     >>> today = datetime.date.today()
     >>> now = datetime.datetime.now()
 
-Create database::
+Install account_payment_processing::
 
-    >>> config = config.set_trytond()
-    >>> config.pool.test = True
-
-Install account_payment_processing and account_bank_statement_payment::
-
-    >>> Module = Model.get('ir.module.module')
-    >>> modules = Module.find(
-    ...     [('name', 'in', ('account_payment_processing',
-    ...                 'account_bank_statement_payment'))])
-    >>> Module.install([m.id for m in modules], config.context)
-    >>> Wizard('ir.module.module.install_upgrade').execute('upgrade')
+    >>> config = activate_modules(['account_payment_processing',
+    ...         'account_bank_statement_payment'])
 
 Create company::
 
-    >>> Currency = Model.get('currency.currency')
-    >>> CurrencyRate = Model.get('currency.currency.rate')
-    >>> currencies = Currency.find([('code', '=', 'USD')])
-    >>> if not currencies:
-    ...     currency = Currency(name='US Dollar', symbol=u'$', code='USD',
-    ...         rounding=Decimal('0.01'), mon_grouping='[]',
-    ...         mon_decimal_point='.')
-    ...     currency.save()
-    ...     CurrencyRate(date=today + relativedelta(month=1, day=1),
-    ...         rate=Decimal('1.0'), currency=currency).save()
-    ... else:
-    ...     currency, = currencies
-    >>> Company = Model.get('company.company')
-    >>> Party = Model.get('party.party')
-    >>> company_config = Wizard('company.company.config')
-    >>> company_config.execute('company')
-    >>> company = company_config.form
-    >>> party = Party(name='Dunder Mifflin')
-    >>> party.save()
-    >>> company.party = party
-    >>> company.currency = currency
-    >>> company_config.execute('add')
-    >>> company, = Company.find([])
-
-Reload the context::
-
-    >>> User = Model.get('res.user')
-    >>> config._context = User.get_preferences(True, config.context)
+    >>> _ = create_company()
+    >>> company = get_company()
+    >>> tax_identifier = company.party.identifiers.new()
+    >>> tax_identifier.type = 'eu_vat'
+    >>> tax_identifier.code = 'BE0897290877'
+    >>> company.party.save()
 
 Create fiscal year::
 
-    >>> FiscalYear = Model.get('account.fiscalyear')
-    >>> Sequence = Model.get('ir.sequence')
-    >>> SequenceStrict = Model.get('ir.sequence.strict')
-    >>> fiscalyear = FiscalYear(name=str(today.year))
-    >>> fiscalyear.start_date = today + relativedelta(month=1, day=1)
-    >>> fiscalyear.end_date = today + relativedelta(month=12, day=31)
-    >>> fiscalyear.company = company
-    >>> post_move_seq = Sequence(name=str(today.year), code='account.move',
-    ...     company=company)
-    >>> post_move_seq.save()
-    >>> fiscalyear.post_move_sequence = post_move_seq
-    >>> invoice_seq = SequenceStrict(name=str(today.year),
-    ...     code='account.invoice', company=company)
-    >>> invoice_seq.save()
-    >>> fiscalyear.out_invoice_sequence = invoice_seq
-    >>> fiscalyear.in_invoice_sequence = invoice_seq
-    >>> fiscalyear.out_credit_note_sequence = invoice_seq
-    >>> fiscalyear.in_credit_note_sequence = invoice_seq
-    >>> fiscalyear.save()
-    >>> FiscalYear.create_period([fiscalyear.id], config.context)
+    >>> fiscalyear = set_fiscalyear_invoice_sequences(
+    ...     create_fiscalyear(company))
+    >>> fiscalyear.click('create_period')
+    >>> period = fiscalyear.periods[0]
 
 Create chart of accounts::
 
-    >>> AccountTemplate = Model.get('account.account.template')
+    >>> _ = create_chart(company)
+    >>> accounts = get_accounts(company)
+    >>> receivable = accounts['receivable']
+    >>> revenue = accounts['revenue']
+    >>> expense = accounts['expense']
+    >>> account_tax = accounts['tax']
+    >>> account_cash = accounts['cash']
+    >>> account_cash.bank_reconcile = True
+    >>> account_cash.reconcile = True
+    >>> account_cash.save()
     >>> Account = Model.get('account.account')
-    >>> account_template, = AccountTemplate.find([('parent', '=', None)])
-    >>> create_chart = Wizard('account.create_chart')
-    >>> create_chart.execute('account')
-    >>> create_chart.form.account_template = account_template
-    >>> create_chart.form.company = company
-    >>> create_chart.execute('create_account')
-    >>> receivable, = Account.find([
-    ...         ('kind', '=', 'receivable'),
-    ...         ('company', '=', company.id),
-    ...         ])
-    >>> payable, = Account.find([
-    ...         ('kind', '=', 'payable'),
-    ...         ('company', '=', company.id),
-    ...         ])
-    >>> revenue, = Account.find([
-    ...         ('kind', '=', 'revenue'),
-    ...         ('company', '=', company.id),
-    ...         ])
-    >>> expense, = Account.find([
-    ...         ('kind', '=', 'expense'),
-    ...         ('company', '=', company.id),
-    ...         ])
-    >>> account_tax, = Account.find([
-    ...         ('kind', '=', 'other'),
-    ...         ('company', '=', company.id),
-    ...         ('name', '=', 'Main Tax'),
-    ...         ])
-    >>> cash, = Account.find([
-    ...         ('kind', '=', 'other'),
-    ...         ('company', '=', company.id),
-    ...         ('name', '=', 'Main Cash'),
-    ...         ])
-    >>> cash.bank_reconcile = True
-    >>> cash.reconcile = True
-    >>> cash.save()
     >>> customer_processing_payments = Account(
     ...     name='Customers Processing Payments',
     ...     type=receivable.type,
@@ -126,7 +60,6 @@ Create chart of accounts::
     ...     reconcile=True,
     ...     party_required=True,
     ...     deferral=True,
-    ...     parent=receivable.parent,
     ...     kind='other')
     >>> customer_processing_payments.save()
     >>> customer_bank_discounts = Account(
@@ -136,15 +69,12 @@ Create chart of accounts::
     ...     reconcile=True,
     ...     party_required=True,
     ...     deferral=True,
-    ...     parent=receivable.parent,
     ...     kind='other')
     >>> customer_bank_discounts.save()
-    >>> create_chart.form.account_receivable = receivable
-    >>> create_chart.form.account_payable = payable
-    >>> create_chart.execute('create_properties')
 
 Create and get journals::
 
+    >>> Sequence = Model.get('ir.sequence')
     >>> sequence = Sequence(name='Bank', code='account.journal',
     ...     company=company)
     >>> sequence.save()
@@ -152,8 +82,8 @@ Create and get journals::
     >>> bank_journal = AccountJournal(
     ...     name='Bank Statement',
     ...     type='cash',
-    ...     credit_account=cash,
-    ...     debit_account=cash,
+    ...     credit_account=account_cash,
+    ...     debit_account=account_cash,
     ...     sequence=sequence)
     >>> bank_journal.save()
     >>> revenue_journal, = AccountJournal.find([('code', '=', 'REV')])
@@ -348,8 +278,8 @@ we doesn't have cash::
     >>> customer_bank_discounts.reload()
     >>> customer_bank_discounts.balance
     Decimal('0.00')
-    >>> cash.reload()
-    >>> cash.balance
+    >>> account_cash.reload()
+    >>> account_cash.balance
     Decimal('0.00')
 
 But finally, the customer pays the invoice directly::
@@ -502,8 +432,8 @@ Create transaction lines on statement lines and post them::
 
 All the amount is on cash account and as debit with bank::
 
-    >>> cash.reload()
-    >>> cash.balance
+    >>> account_cash.reload()
+    >>> account_cash.balance
     Decimal('340.00')
     >>> customer_bank_discounts.reload()
     >>> customer_bank_discounts.balance
@@ -584,6 +514,6 @@ do not have the third invoice amount::
     >>> customer_bank_discounts.reload()
     >>> customer_bank_discounts.balance
     Decimal('0.00')
-    >>> cash.reload()
-    >>> cash.balance
+    >>> account_cash.reload()
+    >>> account_cash.balance
     Decimal('300.00')
