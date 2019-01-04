@@ -67,7 +67,7 @@ Create chart of accounts::
     ...     type=receivable.type,
     ...     bank_reconcile=True,
     ...     reconcile=True,
-    ...     party_required=True,
+    ...     party_required=False,
     ...     deferral=True,
     ...     kind='other')
     >>> customer_bank_discounts.save()
@@ -139,7 +139,7 @@ Create payment term::
 Create customer invoice::
 
     >>> Invoice = Model.get('account.invoice')
-    >>> customer_invoice = Invoice(type='out_invoice')
+    >>> customer_invoice = Invoice(type='out')
     >>> customer_invoice.party = customer
     >>> customer_invoice.payment_term = payment_term
     >>> invoice_line = customer_invoice.lines.new()
@@ -159,7 +159,8 @@ Create customer invoice payment::
     ...     if l.account == receivable]
     >>> pay_line = Wizard('account.move.line.pay', [line])
     >>> pay_line.form.journal = payment_receivable_100_journal
-    >>> pay_line.execute('pay')
+    >>> pay_line.form.approve = False
+    >>> pay_line.execute('start')
     >>> payment, = Payment.find([('state', '=', 'draft')])
     >>> payment.amount
     Decimal('100.00')

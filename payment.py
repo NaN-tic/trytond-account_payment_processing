@@ -47,7 +47,7 @@ class Payment:
             if move:
                 moves.append(move)
         if moves:
-            moves = Move.create([m._save_values for m in moves])
+            Move.save(moves)
             cls.write(*sum((([m.origin], {'processing_move': m.id})
                         for m in moves), ()))
             Move.post(moves)
@@ -79,6 +79,7 @@ class Payment:
         if (not self.journal.processing_account
                 or not self.journal.processing_journal):
             return
+
         if self.processing_move:
             return self.processing_move
 
