@@ -190,9 +190,6 @@ class Payment:
         to_post = []
         for payment in payments:
             if payment.processing_move:
-                if (payment.processing_move.state == 'posted'
-                        and payment.processing_move.journal.update_posted):
-                    Move.draft([payment.processing_move])
                 if payment.processing_move.state == 'draft':
                     to_delete.append(payment.processing_move)
                     for line in payment.processing_move.lines:

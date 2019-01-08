@@ -177,10 +177,11 @@ Check invoice is still pending to pay so the amount is in customer's debit accou
 
     >>> customer_invoice.reload()
     >>> customer_invoice.state
-    u'posted'
-    >>> receivable.reload()
-    >>> receivable.balance
-    Decimal('100.00')
+    u'paid'
+    >>> payment.processing_move != None
+    True
+    >>> payment.clearing_move is None
+    True
 
 Create and confirm bank statement::
 
@@ -201,7 +202,7 @@ Create transaction lines on statement line and post it::
     >>> st_move_line = statement_line.lines.new()
     >>> st_move_line.payment = payment
     >>> st_move_line.amount
-    Decimal('100.0')
+    Decimal('100.00')
     >>> st_move_line.account.name
     u'Customers Bank Discount'
     >>> st_move_line.party.name
@@ -254,7 +255,7 @@ Create transaction lines on statement line and post it::
     >>> st_move_line = statement_line2.lines.new()
     >>> st_move_line.payment = payment
     >>> st_move_line.amount
-    Decimal('-100.0')
+    Decimal('-100.00')
     >>> st_move_line.account.name
     u'Customers Bank Discount'
     >>> st_move_line.party.name
@@ -301,7 +302,7 @@ Create transaction lines on statement line and post it::
     >>> st_move_line = statement_line3.lines.new()
     >>> st_move_line.invoice = customer_invoice
     >>> st_move_line.amount
-    Decimal('100.0')
+    Decimal('100.00')
     >>> st_move_line.account.name
     u'Main Receivable'
     >>> st_move_line.party.name
@@ -323,7 +324,7 @@ So the payment is succeeded, the invoice paid again and due amounts are 0::
 
 Create two customer invoices::
 
-    >>> customer_invoice2 = Invoice(type='out_invoice')
+    >>> customer_invoice2 = Invoice(type='out')
     >>> customer_invoice2.party = customer
     >>> customer_invoice2.payment_term = payment_term
     >>> invoice_line = customer_invoice2.lines.new()
@@ -336,7 +337,7 @@ Create two customer invoices::
     >>> customer_invoice2.state
     u'posted'
 
-    >>> customer_invoice3 = Invoice(type='out_invoice')
+    >>> customer_invoice3 = Invoice(type='out')
     >>> customer_invoice3.party = customer
     >>> customer_invoice3.payment_term = payment_term
     >>> invoice_line = customer_invoice3.lines.new()
@@ -359,7 +360,7 @@ Create a payment with 80% bank discount for first of them::
     ...     if l.account == receivable]
     >>> pay_line = Wizard('account.move.line.pay', [line])
     >>> pay_line.form.journal = payment_receivable_80_journal
-    >>> pay_line.execute('pay')
+    >>> pay_line.execute('start')
     >>> payment2, = Payment.find([('state', '=', 'draft')])
     >>> payment2.amount
     Decimal('200.00')
@@ -378,7 +379,7 @@ And another payment with 100% bank discount for the second one::
     ...     if l.account == receivable]
     >>> pay_line = Wizard('account.move.line.pay', [line])
     >>> pay_line.form.journal = payment_receivable_100_journal
-    >>> pay_line.execute('pay')
+    >>> pay_line.execute('start')
     >>> payment3, = Payment.find([('state', '=', 'draft')])
     >>> payment3.amount
     Decimal('80.00')
@@ -413,7 +414,7 @@ Create transaction lines on statement lines and post them::
     >>> st_move_line = statement_line4.lines.new()
     >>> st_move_line.payment = payment2
     >>> st_move_line.amount
-    Decimal('160.0')
+    Decimal('160.00')
     >>> st_move_line.account.name
     u'Customers Bank Discount'
     >>> st_move_line.party.name
@@ -423,7 +424,7 @@ Create transaction lines on statement lines and post them::
     >>> st_move_line = statement_line5.lines.new()
     >>> st_move_line.payment = payment2
     >>> st_move_line.amount
-    Decimal('80.0')
+    Decimal('80.00')
     >>> st_move_line.account.name
     u'Customers Bank Discount'
     >>> st_move_line.party.name
@@ -466,7 +467,7 @@ invoice, selecting the invoice and the payment::
     >>> st_move_line.payment == payment2
     True
     >>> st_move_line.amount
-    Decimal('40.0')
+    Decimal('40.00')
     >>> st_move_line.account.name
     u'Main Receivable'
     >>> st_move_line.party.name
@@ -481,7 +482,7 @@ The payment of second customer invoice is succeeded::
     u'succeeded'
     >>> customer_invoice2.reload()
     >>> customer_invoice2.state
-    u'paid'
+    u'posted'
 
 Create transaction line on statement line with recovering of bank discount for
 third invoice selecting the payment::
@@ -489,7 +490,7 @@ third invoice selecting the payment::
     >>> st_move_line = statement_line7.lines.new()
     >>> st_move_line.payment = payment3
     >>> st_move_line.amount
-    Decimal('-80.0')
+    Decimal('-80.00')
     >>> st_move_line.account.name
     u'Customers Bank Discount'
     >>> st_move_line.party.name
