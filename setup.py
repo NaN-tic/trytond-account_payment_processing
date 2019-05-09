@@ -4,7 +4,7 @@
 from setuptools import setup
 import re
 import os
-import ConfigParser
+import configparser
 
 MODULE = 'account_payment_processing'
 PREFIX = 'nantic'
@@ -24,7 +24,7 @@ def get_require_version(name):
         major_version, minor_version + 1)
     return require
 
-config = ConfigParser.ConfigParser()
+config = configparser.ConfigParser()
 config.readfp(open('tryton.cfg'))
 info = dict(config.items('tryton'))
 for key in ('depends', 'extras_depend', 'xml'):

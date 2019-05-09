@@ -11,9 +11,8 @@ from trytond.transaction import Transaction
 __all__ = ['Journal', 'Payment']
 
 
-class Journal:
+class Journal(metaclass=PoolMeta):
     __name__ = 'account.payment.journal'
-    __metaclass__ = PoolMeta
     processing_account = fields.Many2One('account.account',
         'Processing Account', states={
             'required': Bool(Eval('processing_journal')),
@@ -26,9 +25,8 @@ class Journal:
         depends=['processing_account'])
 
 
-class Payment:
+class Payment(metaclass=PoolMeta):
     __name__ = 'account.payment'
-    __metaclass__ = PoolMeta
     processing_move = fields.Many2One('account.move', 'Processing Move',
         readonly=True)
 
@@ -61,7 +59,7 @@ class Payment:
                     if l.account == payment.line.account] + [payment.line]
                 if not sum(l.debit - l.credit for l in lines):
                     to_reconcile[payment.party].extend(lines)
-        for lines in to_reconcile.itervalues():
+        for lines in list(to_reconcile.values()):
             Line.reconcile(lines)
 
         return group
@@ -159,7 +157,7 @@ class Payment:
                             line.account.id,
                             line.party.id if line.party else None)
                         to_reconcile[key].append(line)
-                for lines in to_reconcile.itervalues():
+                for lines in list(to_reconcile.values()):
                     if not sum((l.debit - l.credit) for l in lines):
                         Line.reconcile(lines)
 
@@ -212,7 +210,7 @@ class Payment:
         if to_post:
             Move.post(to_post)
         for party in to_reconcile:
-            for lines in to_reconcile[party].itervalues():
+            for lines in list(to_reconcile[party].values()):
                 Line.reconcile(lines)
 
         cls.write(payments, {'processing_move': None})

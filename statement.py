@@ -9,9 +9,8 @@ from trytond.pool import Pool, PoolMeta
 __all__ = ['StatementMoveLine']
 
 
-class StatementMoveLine:
+class StatementMoveLine(metaclass=PoolMeta):
     __name__ = 'account.bank.statement.move.line'
-    __metaclass__ = PoolMeta
 
     @fields.depends('invoice', 'payment')
     def on_change_invoice(self):
@@ -66,6 +65,6 @@ class StatementMoveLine:
                         line.account.id,
                         line.party.id if line.party else None)
                     to_reconcile[key].append(line)
-            for lines in to_reconcile.itervalues():
+            for lines in list(to_reconcile.values()):
                 if not sum((l.debit - l.credit) for l in lines):
                     MoveLine.reconcile(lines)
