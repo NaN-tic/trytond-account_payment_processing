@@ -137,7 +137,6 @@ Create payment term::
     >>> payment_term = PaymentTerm(name='Direct')
     >>> payment_term_line = payment_term.lines.new()
     >>> payment_term_line.type = 'remainder'
-    >>> payment_term_line.days = 0
     >>> payment_term.save()
 
 Create customer invoice::
@@ -164,7 +163,6 @@ Create customer invoice payment::
     >>> pay_line = Wizard('account.move.line.pay', [line])
     >>> pay_line.execute('next_')
     >>> pay_line.form.journal = payment_receivable_100_journal
-    >>> pay_line.form.approve = False
     >>> pay_line.execute('next_')
     >>> payment, = Payment.find([('state', '=', 'draft')])
     >>> payment.amount
