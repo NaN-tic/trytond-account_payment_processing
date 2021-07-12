@@ -17,10 +17,10 @@ class StatementMoveLine(metaclass=PoolMeta):
         changes = super(StatementMoveLine, self).on_change_invoice()
         if self.invoice and self.payment and self.payment.processing_move:
             # compatibility with account_bank_statement_payment
-            clearing_perncent = (
+            clearing_percent = (
                 getattr(self.payment.journal, 'clearing_percent', Decimal(1))
                 or Decimal(1))
-            if clearing_perncent == Decimal(1):
+            if clearing_percent == Decimal(1):
                 for line in self.payment.processing_move.lines:
                     if line.account != self.payment.line.account:
                         changes['account'] = line.account.id
