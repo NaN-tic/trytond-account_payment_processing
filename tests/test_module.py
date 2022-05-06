@@ -9,6 +9,7 @@ from trytond.tests.test_tryton import ModuleTestCase
 class AccountPaymentProcessingTestCase(CompanyTestMixin, ModuleTestCase):
     'Test AccountPaymentProcessing module'
     module = 'account_payment_processing'
+    extras = ['account_bank_statement_payment']
 
 
 del ModuleTestCase
