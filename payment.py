@@ -28,9 +28,9 @@ class Journal(metaclass=PoolMeta):
     def __setup__(cls):
         super().__setup__()
         cls.clearing_journal.context = {'company': Eval('company')}
-        cls.clearing_journal.depends.append('company')
+        cls.clearing_journal.depends.add('company')
         cls.processing_journal.context = {'company': Eval('company')}
-        cls.processing_journal.depends.append('company')
+        cls.processing_journal.depends.add('company')
 
 
 class Payment(metaclass=PoolMeta):
