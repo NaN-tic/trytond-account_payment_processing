@@ -169,8 +169,8 @@ class Payment(metaclass=PoolMeta):
                     if not sum((l.debit - l.credit) for l in lines):
                         Line.reconcile(lines)
 
-    def create_clearing_move(self, date=None):
-        move = super(Payment, self).create_clearing_move(date=date)
+    def _get_clearing_move(self, date=None):
+        move = super(Payment, self)._get_clearing_move(date=date)
         if move and self.processing_move:
             for line in move.lines:
                 if line.account == self.line.account:

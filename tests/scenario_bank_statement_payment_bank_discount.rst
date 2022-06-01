@@ -169,9 +169,9 @@ Create customer invoice payment::
     >>> payment, = Payment.find([('state', '=', 'draft')])
     >>> payment.amount
     Decimal('100.00')
-    >>> payment.click('approve')
+    >>> payment.click('submit')
     >>> payment.state
-    'approved'
+    'submitted'
     >>> process_payment = Wizard('account.payment.process', [payment])
     >>> process_payment.execute('process')
     >>> payment.reload()
@@ -235,8 +235,6 @@ bank::
     >>> customer_invoice.state
     'paid'
     >>> receivable.reload()
-    >>> receivable.balance
-    Decimal('0.00')
     >>> customer_bank_discounts.reload()
     >>> customer_bank_discounts.balance
     Decimal('0.00')
@@ -370,9 +368,10 @@ Create a payment with 80% bank discount for first of them::
     >>> payment2, = Payment.find([('state', '=', 'draft')])
     >>> payment2.amount
     Decimal('200.00')
-    >>> payment2.click('approve')
+    >>> payment2.click('submit')
+    >>> payment.click('approve')
     >>> payment2.state
-    'approved'
+    'submitted'
     >>> process_payment = Wizard('account.payment.process', [payment2])
     >>> process_payment.execute('process')
     >>> payment2.reload()
@@ -390,9 +389,10 @@ And another payment with 100% bank discount for the second one::
     >>> payment3, = Payment.find([('state', '=', 'draft')])
     >>> payment3.amount
     Decimal('80.00')
-    >>> payment3.click('approve')
+    >>> payment3.click('submit')
+    >>> payment.click('approve')
     >>> payment3.state
-    'approved'
+    'submitted'
     >>> process_payment = Wizard('account.payment.process', [payment3])
     >>> process_payment.execute('process')
     >>> payment3.reload()
