@@ -16,13 +16,11 @@ class Journal(metaclass=PoolMeta):
     processing_account = fields.Many2One('account.account',
         'Processing Account', states={
             'required': Bool(Eval('processing_journal')),
-            },
-        depends=['processing_journal'])
+            })
     processing_journal = fields.Many2One('account.journal',
         'Processing Journal', states={
             'required': Bool(Eval('processing_account')),
-            },
-        depends=['processing_account'])
+            })
 
     @classmethod
     def __setup__(cls):
