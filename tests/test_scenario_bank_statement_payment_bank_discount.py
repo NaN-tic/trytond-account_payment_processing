@@ -163,6 +163,7 @@ class Test(unittest.TestCase):
         self.assertEqual(payment.amount, Decimal('100.00'))
         payment.click('submit')
         self.assertEqual(payment.state, 'submitted')
+        payment.click('process_wizard')
         payment.reload()
         self.assertEqual(payment.state, 'processing')
 
@@ -198,13 +199,11 @@ class Test(unittest.TestCase):
         self.assertEqual(customer_bank_discounts.balance, Decimal('-100.00'))
 
         # When the invoice due date plus some margin days arrives, if the bank doesn't
-
         # substract the advanced amount is because the payment succeeded
         payment.click('succeed')
         self.assertNotEqual(payment.clearing_move, None)
 
         # Now, the invoice is paid, the customer's due amount is zero, also owr due with
-
         # bank
         customer_invoice.reload()
         self.assertEqual(customer_invoice.state, 'paid')
@@ -213,7 +212,6 @@ class Test(unittest.TestCase):
         self.assertEqual(customer_bank_discounts.balance, Decimal('0.00'))
 
         # But if after that, the bank substracts the advanced amount, we create the bank
-
         # statement
         statement2 = BankStatement(journal=statement_journal, date=now)
         statement_line = statement2.lines.new()
@@ -235,7 +233,6 @@ class Test(unittest.TestCase):
         statement_line2.click('post')
 
         # The payment is failed, clearing move reverted so amount is due by customer and
-
         # we doesn't have cash
         payment.reload()
         self.assertEqual(payment.state, 'failed')
@@ -316,6 +313,7 @@ class Test(unittest.TestCase):
         payment2.click('submit')
         payment.click('approve')
         self.assertEqual(payment2.state, 'submitted')
+        payment2.click('process_wizard')
         payment2.reload()
         self.assertEqual(payment2.state, 'processing')
 
@@ -332,6 +330,7 @@ class Test(unittest.TestCase):
         payment3.click('submit')
         payment.click('approve')
         self.assertEqual(payment3.state, 'submitted')
+        payment3.click('process_wizard')
         payment3.reload()
         self.assertEqual(payment3.state, 'processing')
 
@@ -373,7 +372,6 @@ class Test(unittest.TestCase):
         self.assertEqual(customer_bank_discounts.balance, Decimal('-240.00'))
 
         # When the invoices due date arrives, the pending amount of second invoice is
-
         # paid by customer but bank substract the third invoice amount
         statement5 = BankStatement(journal=statement_journal, date=now)
         statement_line = statement5.lines.new()
@@ -389,7 +387,6 @@ class Test(unittest.TestCase):
         self.assertEqual(statement5.state, 'confirmed')
 
         # Create transaction line on statement line with pending amount of second
-
         # invoice, selecting the invoice and the payment
         statement_line6, statement_line7 = statement5.lines
         st_move_line = statement_line6.lines.new()
@@ -408,7 +405,6 @@ class Test(unittest.TestCase):
         self.assertEqual(customer_invoice2.state, 'posted')
 
         # Create transaction line on statement line with recovering of bank discount for
-
         # third invoice selecting the payment
         st_move_line = statement_line7.lines.new()
         st_move_line.payment = payment3
@@ -425,7 +421,6 @@ class Test(unittest.TestCase):
         self.assertEqual(customer_invoice3.state, 'posted')
 
         # The third invoice amount is also owed, the due with bank is empty and the cash
-
         # do not have the third invoice amount
         receivable.reload()
         self.assertEqual(receivable.balance, Decimal('80.00'))
