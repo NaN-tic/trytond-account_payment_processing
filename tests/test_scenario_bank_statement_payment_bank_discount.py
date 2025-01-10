@@ -261,7 +261,7 @@ class Test(unittest.TestCase):
         st_move_line = statement_line3.lines.new()
         st_move_line.invoice = customer_invoice
         self.assertEqual(st_move_line.amount, Decimal('100.00'))
-        self.assertEqual(st_move_line.account.name, 'Main Receivable')
+        self.assertEqual(st_move_line.account.name, 'Accounts, Notes And Loans Receivable')
         self.assertEqual(st_move_line.party.name, 'Customer')
         statement_line3.save()
         statement_line3.click('post')
@@ -393,7 +393,7 @@ class Test(unittest.TestCase):
         st_move_line.invoice = customer_invoice2
         self.assertEqual(st_move_line.payment, payment2)
         self.assertEqual(st_move_line.amount, Decimal('40.00'))
-        self.assertEqual(st_move_line.account.name, 'Main Receivable')
+        self.assertEqual(st_move_line.account.name, 'Accounts, Notes And Loans Receivable')
         self.assertEqual(st_move_line.party.name, 'Customer')
         statement_line6.save()
         statement_line6.click('post')
