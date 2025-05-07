@@ -72,17 +72,8 @@ class Test(unittest.TestCase):
         customer_bank_discounts.save()
 
         # Create and get journals
-        Sequence = Model.get('ir.sequence')
-        SequenceType = Model.get('ir.sequence.type')
-        sequence_type, = SequenceType.find([('name', '=', 'Account Journal')])
-        sequence = Sequence(name='Bank',
-                            sequence_type=sequence_type,
-                            company=company)
-        sequence.save()
         AccountJournal = Model.get('account.journal')
-        bank_journal = AccountJournal(name='Bank Statement',
-                                      type='cash',
-                                      sequence=sequence)
+        bank_journal = AccountJournal(name='Bank Statement', type='cash')
         bank_journal.save()
         PaymentMethod = Model.get('account.invoice.payment.method')
         payment_method = PaymentMethod()
