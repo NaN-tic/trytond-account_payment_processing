@@ -17,5 +17,24 @@
             <field name="inherit" ref="account_payment.payment_view_form"/>
             <field name="name">payment_form</field>
         </record>
+
+        <record model="ir.action.wizard" id="wizard_bank_debt_reconcile">
+            <field name="name">Reconcile Bank Debt</field>
+            <field name="wiz_name">account.payment.journal.bank_debt.reconcile</field>
+            <field name="model">account.payment.journal</field>
+        </record>
+
+        <record model="ir.ui.view" id="bank_debt_reconcile_start_view_form">
+            <field name="model">account.payment.journal.bank_debt.reconcile.start</field>
+            <field name="type">form</field>
+            <field name="name">bank_debt_reconcile_start_form</field>
+        </record>
+    </data>
+    <data noupdate="1">
+        <record model="ir.cron" id="cron_reconcile_bank_debt">
+            <field name="method">account.payment.journal|cron_reconcile_bank_debt</field>
+            <field name="interval_number" eval="1"/>
+            <field name="interval_type">days</field>
+        </record>
     </data>
 </tryton>

@@ -160,8 +160,9 @@ class Test(unittest.TestCase):
 
         # Check invoice is still pending to pay so the amount is in customer's debit account
         customer_invoice.reload()
-        self.assertEqual(customer_invoice.state, 'paid')
+        self.assertEqual(customer_invoice.state, 'posted')
         self.assertNotEqual(payment.processing_move, None)
+        self.assertEqual(payment.processing_move.state, 'draft')
         self.assertEqual(payment.clearing_move, None)
 
         # Create and confirm bank statement
@@ -393,7 +394,7 @@ class Test(unittest.TestCase):
         payment2.reload()
         self.assertEqual(payment2.state, 'succeeded')
         customer_invoice2.reload()
-        self.assertEqual(customer_invoice2.state, 'posted')
+        self.assertEqual(customer_invoice2.state, 'paid')
 
         # Create transaction line on statement line with recovering of bank discount for
         # third invoice selecting the payment
@@ -414,7 +415,7 @@ class Test(unittest.TestCase):
         # The third invoice amount is also owed, the due with bank is empty and the cash
         # do not have the third invoice amount
         receivable.reload()
-        self.assertEqual(receivable.balance, Decimal('80.00'))
+        self.assertEqual(receivable.balance, Decimal('-80.00'))
         customer_bank_discounts.reload()
         self.assertEqual(customer_bank_discounts.balance, Decimal('0.00'))
         account_cash.reload()

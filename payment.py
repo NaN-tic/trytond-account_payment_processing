@@ -5,10 +5,16 @@ from decimal import Decimal
 
 from trytond.model import ModelView, Workflow, fields
 from trytond.pool import Pool, PoolMeta
-from trytond.pyson import Bool, Eval
+from trytond.pyson import Bool, Eval, TimeDelta
 from trytond.transaction import Transaction
+from trytond.wizard import Button, StateTransition, StateView, Wizard
 
-__all__ = ['Journal', 'Payment']
+__all__ = [
+    'Journal',
+    'Payment',
+    'BankDebtReconcile',
+    'BankDebtReconcileStart',
+    ]
 
 
 class Journal(metaclass=PoolMeta):
@@ -21,15 +27,152 @@ class Journal(metaclass=PoolMeta):
         'Processing Journal', states={
             'required': Bool(Eval('processing_account')),
             })
+    bank_debt_account = fields.Many2One('account.account',
+        'Bank Debt Account',
+        domain=[
+            ('company', '=', Eval('company', -1)),
+            ('type', '!=', None),
+            ('closed', '!=', True),
+            ])
+    bank_debt_maturity_delay = fields.TimeDelta(
+        "Bank Debt Maturity Delay",
+        domain=['OR',
+            ('bank_debt_maturity_delay', '=', None),
+            ('bank_debt_maturity_delay', '>=', TimeDelta()),
+            ],
+        states={
+            'invisible': ~Bool(Eval('bank_debt_account')),
+            },
+        depends=['bank_debt_account'],
+        help="Delay added to the payment maturity date for the bank debt.")
 
     @classmethod
     def __setup__(cls):
         super().__setup__()
-        cls.clearing_journal.context = {'company': Eval('company', -1)}
-        cls.clearing_journal.depends.add('company')
+        if hasattr(cls, 'clearing_journal'):
+            cls.clearing_journal.context = {'company': Eval('company', -1)}
+            cls.clearing_journal.depends.add('company')
         cls.processing_journal.context = {'company': Eval('company', -1)}
         cls.processing_journal.depends.add('company')
 
+    @classmethod
+    def cron_reconcile_bank_debt(cls, date=None):
+        pool = Pool()
+        Date = pool.get('ir.date')
+        if date is None:
+            date = Date.today()
+        journals = cls.search([
+                ('company', '=', Transaction().context.get('company')),
+                ('bank_debt_account', '!=', None),
+                ])
+        cls.reconcile_bank_debt(journals, date=date)
+
+    @classmethod
+    def reconcile_bank_debt(cls, journals, date=None):
+        pool = Pool()
+        Date = pool.get('ir.date')
+        Line = pool.get('account.move.line')
+        Move = pool.get('account.move')
+        Period = pool.get('account.period')
+        Payment = pool.get('account.payment')
+
+        if date is None:
+            date = Date.today()
+
+        moves = []
+        to_reconcile = []
+        to_reconcile_counterpart = []
+        for journal in journals:
+            if not journal.bank_debt_account:
+                continue
+            if not journal.processing_journal:
+                continue
+
+            lines = Line.search([
+                    ('account', '=', journal.bank_debt_account.id),
+                    ('maturity_date', '!=', None),
+                    ('maturity_date', '<=', date),
+                    ('reconciliation', '=', None),
+                    ('move_state', '=', 'posted'),
+                    ])
+            for line in lines:
+                origin = line.move.origin
+                if not isinstance(origin, Payment):
+                    continue
+                payment = origin
+                if payment.company != journal.company:
+                    continue
+                counterpart_account = (
+                    journal.processing_account
+                    or (payment.line.account if payment.line else None))
+                if not counterpart_account:
+                    continue
+
+                move_date = line.maturity_date or date
+                period = Period.find(journal.company.id, date=move_date)
+
+                move = Move(
+                    journal=journal.processing_journal,
+                    origin=payment,
+                    date=move_date,
+                    period=period,
+                    company=journal.company)
+
+                balance = line.debit - line.credit
+                if not balance:
+                    continue
+                bank_line = Line()
+                bank_line.account = journal.bank_debt_account
+                if balance > 0:
+                    bank_line.debit, bank_line.credit = 0, balance
+                else:
+                    bank_line.debit, bank_line.credit = -balance, 0
+                bank_line.party = (payment.party
+                    if bank_line.account.party_required else None)
+
+                counterpart = Line()
+                if balance > 0:
+                    counterpart.debit, counterpart.credit = balance, 0
+                else:
+                    counterpart.debit, counterpart.credit = 0, -balance
+                counterpart.account = counterpart_account
+                counterpart.party = (payment.party
+                    if counterpart.account.party_required else None)
+
+                move.lines = (bank_line, counterpart)
+                moves.append(move)
+
+                if bank_line.account.reconcile:
+                    to_reconcile.append([line, bank_line])
+
+                if counterpart.account.reconcile:
+                    counterpart_lines = [counterpart]
+                    if payment.processing_move:
+                        if payment.processing_move.state == 'draft':
+                            Move.post([payment.processing_move])
+                        counterpart_lines += [
+                            l for l in payment.processing_move.lines
+                            if (l.account == counterpart.account
+                                and not l.reconciliation)
+                            ]
+                    if (payment.line
+                            and payment.line.account == counterpart.account
+                            and not payment.line.reconciliation):
+                        counterpart_lines.append(payment.line)
+                    to_reconcile_counterpart.append(counterpart_lines)
+
+        if moves:
+            Move.save(moves)
+            Move.post(moves)
+
+        for line_objs in to_reconcile:
+            lines = Line.browse([l.id for l in line_objs if l.id])
+            if not sum(l.debit - l.credit for l in lines):
+                Line.reconcile(lines)
+        for line_objs in to_reconcile_counterpart:
+            lines = Line.browse([l.id for l in line_objs if l.id])
+            if not sum(l.debit - l.credit for l in lines):
+                Line.reconcile(lines)
 
 class Payment(metaclass=PoolMeta):
     __name__ = 'account.payment'
@@ -41,7 +184,6 @@ class Payment(metaclass=PoolMeta):
     def process(cls, payments, group):
         pool = Pool()
         Move = pool.get('account.move')
-        Line = pool.get('account.move.line')
 
         group = super(Payment, cls).process(payments, group)
 
@@ -54,19 +196,6 @@ class Payment(metaclass=PoolMeta):
             Move.save(moves)
             cls.write(*sum((([m.origin], {'processing_move': m.id})
                         for m in moves), ()))
-            Move.post(moves)
-
-        to_reconcile = defaultdict(list)
-        for payment in payments:
-            if (payment.line
-                    and not payment.line.reconciliation
-                    and payment.processing_move):
-                lines = [l for l in payment.processing_move.lines
-                    if l.account == payment.line.account] + [payment.line]
-                if not sum(l.debit - l.credit for l in lines):
-                    to_reconcile[payment.party].extend(lines)
-        for lines in list(to_reconcile.values()):
-            Line.reconcile(lines)
 
         return group
 
@@ -148,34 +277,14 @@ class Payment(metaclass=PoolMeta):
         super(Payment, cls).succeed(payments)
 
         for payment in payments:
-            if (payment.journal.processing_account
-                    and payment.journal.processing_account.reconcile
-                    and payment.processing_move
-                    and payment.journal.clearing_account
-                    and payment.journal.clearing_account.reconcile
-                    and payment.clearing_move):
-                to_reconcile = defaultdict(list)
-                lines = (payment.processing_move.lines
-                    + payment.clearing_move.lines)
-                for line in lines:
-                    if line.account.reconcile and not line.reconciliation:
-                        key = (
-                            line.account.id,
-                            line.party.id if line.party else None)
-                        to_reconcile[key].append(line)
-                for lines in list(to_reconcile.values()):
-                    if not sum((l.debit - l.credit) for l in lines):
-                        Line.reconcile(lines)
-
-    def _get_clearing_move(self, date=None):
-        move = super(Payment, self)._get_clearing_move(date=date)
-        if move and self.processing_move:
-            for line in move.lines:
-                if line.account == self.line.account:
-                    line.account = self.journal.processing_account
-                    line.party = (self.line.party
-                        if line.account.party_required else None)
-        return move
+            if (payment.processing_move
+                    and payment.processing_move.state == 'posted'
+                    and payment.line
+                    and not payment.line.reconciliation):
+                lines = [l for l in payment.processing_move.lines
+                    if l.account == payment.line.account] + [payment.line]
+                if not sum(l.debit - l.credit for l in lines):
+                    Line.reconcile(lines)
 
     @classmethod
     @ModelView.button
@@ -220,3 +329,33 @@ class Payment(metaclass=PoolMeta):
                 Line.reconcile(lines)
 
         cls.write(payments, {'processing_move': None})
+
+
+class BankDebtReconcileStart(ModelView):
+    "Bank Debt Reconcile Start"
+    __name__ = 'account.payment.journal.bank_debt.reconcile.start'
+    date = fields.Date("Date", required=True)
+
+    @staticmethod
+    def default_date():
+        pool = Pool()
+        Date = pool.get('ir.date')
+        return Date.today()
+
+
+class BankDebtReconcile(Wizard):
+    "Bank Debt Reconcile"
+    __name__ = 'account.payment.journal.bank_debt.reconcile'
+    start = StateView(
+        'account.payment.journal.bank_debt.reconcile.start',
+        'account_payment_processing.bank_debt_reconcile_start_view_form', [
+            Button('Cancel', 'end', 'tryton-cancel'),
+            Button('Reconcile', 'reconcile', 'tryton-ok', default=True),
+            ])
+    reconcile = StateTransition()
+
+    def transition_reconcile(self):
+        pool = Pool()
+        Journal = pool.get('account.payment.journal')
+        Journal.reconcile_bank_debt(self.records, date=self.start.date)
+        return 'end'
