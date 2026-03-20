@@ -8,5 +8,9 @@
         <field name="processing_account"/>
         <label name="processing_journal"/>
         <field name="processing_journal"/>
+        <label name="bank_debt_account"/>
+        <field name="bank_debt_account"/>
+        <label name="bank_debt_maturity_delay"/>
+        <field name="bank_debt_maturity_delay"/>
     </xpath>
 </data>
